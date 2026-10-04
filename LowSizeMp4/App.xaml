@@ -1,0 +1,26 @@
+<Application
+    x:Class="LowSizeMp4.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#0078D4" />
+            <SolidColorBrush x:Key="AppAccentSubtleBrush" Color="#280078D4" />
+            <SolidColorBrush x:Key="AppAccentLightBrush" Color="#450078D4" />
+            <SolidColorBrush x:Key="AppAccentBorderBrush" Color="#900078D4" />
+            <SolidColorBrush x:Key="AppAccentHighlightBrush" Color="#4CC2FF" />
+
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, sans-serif" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,1633 @@
+<ui:FluentWindow
+    x:Class="LowSizeMp4.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:LowSizeMp4"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="LowSizeMp4 — FFmpeg Video Compressor"
+    Width="1180"
+    Height="810"
+    MinWidth="980"
+    MinHeight="660"
+    WindowBackdropType="Mica"
+    ExtendsContentIntoTitleBar="True"
+    WindowStartupLocation="CenterScreen"
+    Icon="Assets/AppIcon.ico"
+    mc:Ignorable="d">
+
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo
+            ProgressState="{Binding TaskbarProgressState}"
+            ProgressValue="{Binding TaskbarProgressValue}" />
+    </Window.TaskbarItemInfo>
+
+    <Window.DataContext>
+        <local:MainViewModel x:Name="ViewModel" />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <!-- Анимация появления вкладок -->
+        <Storyboard x:Key="TabFadeInAnimation">
+            <DoubleAnimation
+                Storyboard.TargetProperty="Opacity"
+                From="0"
+                To="1"
+                Duration="0:0:0.25">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                From="12"
+                To="0"
+                Duration="0:0:0.25">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <!-- Стиль для сегментных переключателей -->
+        <Style x:Key="SegmentedRadioStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border
+                            x:Name="SegBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6"
+                            Padding="12,7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="SegBorder" Property="Background" Value="{DynamicResource AppAccentLightBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SegBorder" Property="Background" Value="#15FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Windows 11 TitleBar -->
+        <ui:TitleBar
+            Grid.Row="0"
+            Title="LowSizeMp4"
+            Icon="Assets/AppIcon.ico" />
+
+        <!-- Главная сетка: Боковой сайдбар + Основной контент -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ========================================================================= -->
+            <!-- ЛЕВЫЙ САЙДБАР -->
+            <!-- ========================================================================= -->
+            <Border
+                Grid.Column="0"
+                Background="#08FFFFFF"
+                BorderBrush="#15FFFFFF"
+                BorderThickness="0,0,1,0"
+                Padding="12,8,12,16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Логотип приложения -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4,8,22" VerticalAlignment="Center">
+                        <Image Source="Assets/AppIcon.ico" Width="28" Height="28" Margin="0,0,10,0" />
+                        <StackPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock
+                                    Text="LowSizeMp4"
+                                    FontSize="15"
+                                    FontWeight="Bold"
+                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Border Background="{DynamicResource AppAccentSubtleBrush}" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="v2.0" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock
+                                Text="Video Compressor"
+                                FontSize="11"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                Margin="0,1,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Разделы навигации -->
+                    <StackPanel Grid.Row="1">
+                        <!-- 1. Сжатие -->
+                        <RadioButton
+                            IsChecked="{Binding SelectedNavIndex, Converter={x:Static local:Converters.PresetSelectedConverter}, ConverterParameter=0, Mode=OneWay}"
+                            Click="NavButton_Click"
+                            Tag="0"
+                            GroupName="NavGroup"
+                            Margin="0,0,0,4">
+                            <RadioButton.Style>
+                                <Style TargetType="RadioButton">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="RadioButton">
+                                                <Border
+                                                    x:Name="NavBorder"
+                                                    CornerRadius="8"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    Cursor="Hand">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Video24" FontSize="18" Margin="0,0,12,0" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                        <TextBlock
+                                                            Text="Сжатие"
+                                                            FontWeight="SemiBold"
+                                                            FontSize="14"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource AppAccentSubtleBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="#15FFFFFF" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </RadioButton.Style>
+                        </RadioButton>
+
+                        <!-- 2. Очередь -->
+                        <RadioButton
+                            IsChecked="{Binding SelectedNavIndex, Converter={x:Static local:Converters.PresetSelectedConverter}, ConverterParameter=1, Mode=OneWay}"
+                            Click="NavButton_Click"
+                            Tag="1"
+                            GroupName="NavGroup"
+                            Margin="0,0,0,4">
+                            <RadioButton.Style>
+                                <Style TargetType="RadioButton">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="RadioButton">
+                                                <Border
+                                                    x:Name="NavBorder"
+                                                    CornerRadius="8"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    Cursor="Hand">
+                                                    <Grid>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <ui:SymbolIcon Symbol="TaskListSquareLtr24" FontSize="18" Margin="0,0,12,0" Foreground="#6ccb5f" />
+                                                            <TextBlock
+                                                                Text="Очередь файлов"
+                                                                FontWeight="SemiBold"
+                                                                FontSize="14"
+                                                                VerticalAlignment="Center"
+                                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                        </StackPanel>
+                                                        <Border
+                                                            HorizontalAlignment="Right"
+                                                            Background="{DynamicResource AppAccentLightBrush}"
+                                                            CornerRadius="10"
+                                                            Padding="7,2"
+                                                            Visibility="{Binding Queue.Count, Converter={x:Static local:Converters.HasQueueToVisibleConverter}}">
+                                                            <TextBlock Text="{Binding Queue.Count}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource AppAccentSubtleBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="#15FFFFFF" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </RadioButton.Style>
+                        </RadioButton>
+
+                        <!-- 3. Настройки -->
+                        <RadioButton
+                            IsChecked="{Binding SelectedNavIndex, Converter={x:Static local:Converters.PresetSelectedConverter}, ConverterParameter=2, Mode=OneWay}"
+                            Click="NavButton_Click"
+                            Tag="2"
+                            GroupName="NavGroup"
+                            Margin="0,0,0,4">
+                            <RadioButton.Style>
+                                <Style TargetType="RadioButton">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="RadioButton">
+                                                <Border
+                                                    x:Name="NavBorder"
+                                                    CornerRadius="8"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    Cursor="Hand">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Settings24" FontSize="18" Margin="0,0,12,0" Foreground="#fce100" />
+                                                        <TextBlock
+                                                            Text="Настройки и темы"
+                                                            FontWeight="SemiBold"
+                                                            FontSize="14"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource AppAccentSubtleBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="#15FFFFFF" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </RadioButton.Style>
+                        </RadioButton>
+
+                        <!-- 4. Лог -->
+                        <RadioButton
+                            IsChecked="{Binding SelectedNavIndex, Converter={x:Static local:Converters.PresetSelectedConverter}, ConverterParameter=3, Mode=OneWay}"
+                            Click="NavButton_Click"
+                            Tag="3"
+                            GroupName="NavGroup">
+                            <RadioButton.Style>
+                                <Style TargetType="RadioButton">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="RadioButton">
+                                                <Border
+                                                    x:Name="NavBorder"
+                                                    CornerRadius="8"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    Cursor="Hand">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Code24" FontSize="18" Margin="0,0,12,0" Foreground="#b146c2" />
+                                                        <TextBlock
+                                                            Text="Лог FFmpeg"
+                                                            FontWeight="SemiBold"
+                                                            FontSize="14"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource AppAccentSubtleBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="NavBorder" Property="Background" Value="#15FFFFFF" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </RadioButton.Style>
+                        </RadioButton>
+                    </StackPanel>
+
+                    <!-- Статус FFmpeg внизу -->
+                    <Border
+                        Grid.Row="2"
+                        Background="#10FFFFFF"
+                        BorderBrush="#18FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10,8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse
+                                Width="8"
+                                Height="8"
+                                Margin="0,0,8,0"
+                                Fill="{Binding IsFfmpegInstalled, Converter={x:Static local:Converters.BoolToFfmpegBrushConverter}}" />
+                            <TextBlock
+                                Text="{Binding IsFfmpegInstalled, Converter={x:Static local:Converters.BoolToFfmpegTextConverter}}"
+                                FontSize="12"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ========================================================================= -->
+            <!-- ОСНОВНАЯ ОБЛАСТЬ КОНТЕНТА -->
+            <!-- ========================================================================= -->
+            <Grid Grid.Column="1" Margin="22,14,22,16">
+                <!-- Контейнер с анимацией плавного перехода -->
+                <Grid.RenderTransform>
+                    <TranslateTransform Y="0" />
+                </Grid.RenderTransform>
+
+                <TabControl
+                    SelectedIndex="{Binding SelectedNavIndex}"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0"
+                    SelectionChanged="TabControl_SelectionChanged">
+                    <TabControl.ItemContainerStyle>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </Style>
+                    </TabControl.ItemContainerStyle>
+
+                    <!-- ===================================================================== -->
+                    <!-- ВКЛАДКА 0: СЖАТИЕ ВИДЕО (ГЛАВНАЯ) -->
+                    <!-- ===================================================================== -->
+                    <TabItem>
+                        <Grid>
+                            <!-- 1. РЕЖИМ HERO DROP ZONE (КОГДА ФАЙЛОВ НЕТ) -->
+                            <Grid
+                                Visibility="{Binding Queue.Count, Converter={x:Static local:Converters.EmptyQueueToVisibleConverter}}"
+                                AllowDrop="True"
+                                DragOver="DropZone_DragOver"
+                                DragLeave="DropZone_DragLeave"
+                                Drop="DropZone_Drop"
+                                x:Name="HeroDropZone">
+                                <Border
+                                    Background="#0AFFFFFF"
+                                    BorderBrush="#30FFFFFF"
+                                    BorderThickness="2"
+                                    CornerRadius="20"
+                                    Padding="40">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <!-- Пульсирующая иконка загрузки -->
+                                        <Border
+                                            Width="96"
+                                            Height="96"
+                                            CornerRadius="48"
+                                            Background="{DynamicResource AppAccentSubtleBrush}"
+                                            BorderBrush="{DynamicResource AppAccentBorderBrush}"
+                                            BorderThickness="1.5"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,20">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform x:Name="PulseScale" CenterX="48" CenterY="48" />
+                                            </Border.RenderTransform>
+                                            <Border.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetName="PulseScale"
+                                                                Storyboard.TargetProperty="ScaleX"
+                                                                To="1.08"
+                                                                Duration="0:0:2.5">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetName="PulseScale"
+                                                                Storyboard.TargetProperty="ScaleY"
+                                                                To="1.08"
+                                                                Duration="0:0:2.5">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <SineEase EasingMode="EaseInOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Border.Triggers>
+                                            <ui:SymbolIcon Symbol="ArrowUpload24" FontSize="48" Foreground="{DynamicResource AppAccentHighlightBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <TextBlock
+                                            Text="Перетащите видеофайлы сюда"
+                                            FontSize="24"
+                                            FontWeight="Bold"
+                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,8" />
+
+                                        <TextBlock
+                                            Text="Поддерживаются MP4, MKV, MOV, AVI, WebM, FLV, TS и любые другие форматы"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,24" />
+
+                                        <ui:Button
+                                            Content="Выбрать видео на компьютере"
+                                            Icon="{ui:SymbolIcon FolderOpen24}"
+                                            Appearance="Primary"
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            Padding="30,12"
+                                            HorizontalAlignment="Center"
+                                            Click="PickFilesButton_Click"
+                                            Margin="0,0,0,16" />
+
+                                        <TextBlock
+                                            Text="Можно перетащить сразу несколько файлов — они добавятся в очередь"
+                                            FontSize="12"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- 2. РЕЖИМ СЖАТИЯ (КОГДА ВИДЕО ДОБАВЛЕНО) -->
+                            <Grid
+                                Visibility="{Binding Queue.Count, Converter={x:Static local:Converters.HasQueueToVisibleConverter}}"
+                                AllowDrop="True"
+                                DragOver="DropZone_DragOver"
+                                DragLeave="DropZone_DragLeave"
+                                Drop="DropZone_Drop">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Верхняя панель очереди -->
+                                <Grid Grid.Row="0" Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ui:Button
+                                            Content="Добавить ещё видео..."
+                                            Icon="{ui:SymbolIcon Add24}"
+                                            Click="PickFilesButton_Click"
+                                            Padding="12,6"
+                                            Margin="0,0,12,0" />
+                                        <TextBlock
+                                            Text="{Binding Queue.Count, StringFormat='В очереди: {0} видео'}"
+                                            VerticalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+
+                                    <ui:Button
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Right"
+                                        Content="Очистить всё"
+                                        Icon="{ui:SymbolIcon Delete24}"
+                                        Appearance="Transparent"
+                                        Command="{Binding ClearQueueCommand}"
+                                        IsEnabled="{Binding CanStart}" />
+                                </Grid>
+
+                                <!-- Центр: Карточка видео слева, Пресеты справа -->
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.05*" />
+                                        <ColumnDefinition Width="1.15*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- ЛЕВАЯ КАРТОЧКА: ВИДЕО И ПАРАМЕТРЫ -->
+                                    <ui:Card Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Stretch">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Margin="4">
+                                                <TextBlock
+                                                    Text="Выбранное видео"
+                                                    FontSize="13"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                    Margin="0,0,0,10" />
+
+                                                <!-- Превью кадра 16:9 с бейджем длительности -->
+                                                <Border
+                                                    CornerRadius="10"
+                                                    Background="#10000000"
+                                                    BorderBrush="#25FFFFFF"
+                                                    BorderThickness="1"
+                                                    ClipToBounds="True"
+                                                    Height="180"
+                                                    Margin="0,0,0,12">
+                                                    <Grid>
+                                                        <ui:SymbolIcon Symbol="Video24" FontSize="56" Opacity="0.2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        <Image
+                                                            Source="{Binding SelectedItem.ThumbnailPath}"
+                                                            Stretch="UniformToFill" />
+
+                                                        <Border
+                                                            HorizontalAlignment="Right"
+                                                            VerticalAlignment="Bottom"
+                                                            Background="#D0000000"
+                                                            CornerRadius="4"
+                                                            Padding="7,3"
+                                                            Margin="8">
+                                                            <TextBlock
+                                                                Text="{Binding SelectedItem.DurationFormatted}"
+                                                                FontSize="11"
+                                                                FontWeight="SemiBold"
+                                                                Foreground="#FFFFFF" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- Название файла -->
+                                                <TextBlock
+                                                    Text="{Binding SelectedItem.FileName}"
+                                                    FontSize="16"
+                                                    FontWeight="Bold"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    TextWrapping="Wrap"
+                                                    MaxHeight="45"
+                                                    Margin="0,0,0,10" />
+
+                                                <!-- Чипы с параметрами -->
+                                                <WrapPanel Margin="0,0,0,14">
+                                                    <Border Background="#1CFFFFFF" CornerRadius="6" Padding="8,4" Margin="0,0,8,4">
+                                                        <TextBlock Text="{Binding SelectedItem.FileSizeFormatted, StringFormat='Вес: {0}'}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </Border>
+                                                    <Border Background="#1CFFFFFF" CornerRadius="6" Padding="8,4" Margin="0,0,8,4">
+                                                        <TextBlock Text="{Binding SelectedItem.DurationFormatted, StringFormat='Время: {0}'}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </Border>
+                                                    <Border Background="#1CFFFFFF" CornerRadius="6" Padding="8,4" Margin="0,0,8,4">
+                                                        <TextBlock Text="{Binding SelectedItem.ResolutionFormatted, StringFormat='Формат: {0}'}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    </Border>
+                                                </WrapPanel>
+
+                                                <!-- Путь сохранения -->
+                                                <Border Background="#10FFFFFF" CornerRadius="8" Padding="12" Margin="0,0,0,4">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Куда сохранить:" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,2" />
+                                                        <TextBlock
+                                                            Text="{Binding SelectedItem.OutputPath}"
+                                                            FontSize="12"
+                                                            Foreground="{DynamicResource AppAccentHighlightBrush}"
+                                                            TextWrapping="Wrap"
+                                                            MaxHeight="40"
+                                                            Margin="0,0,0,8" />
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <ui:Button
+                                                                Content="Сменить папку..."
+                                                                Icon="{ui:SymbolIcon FolderOpen24}"
+                                                                Command="{Binding BrowseOutputFolderCommand}"
+                                                                Padding="10,4"
+                                                                Margin="0,0,8,0" />
+                                                            <ui:Button
+                                                                Content="Сбросить"
+                                                                Appearance="Transparent"
+                                                                Command="{Binding ResetOutputFolderCommand}"
+                                                                Visibility="{Binding CustomOutputFolder, Converter={x:Static local:Converters.NotNullToVisibleConverter}}"
+                                                                Padding="8,4" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Обрезка фрагмента (Trimming) и быстрый тест -->
+                                                <Border Background="#10FFFFFF" CornerRadius="8" Padding="12" Margin="0,8,0,0">
+                                                    <StackPanel>
+                                                        <Grid Margin="0,0,0,4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <CheckBox
+                                                                Grid.Column="0"
+                                                                IsChecked="{Binding SelectedItem.IsTrimEnabled, Mode=TwoWay}"
+                                                                VerticalAlignment="Center">
+                                                                <TextBlock Text="Обрезать фрагмент видео" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="4,0,0,0" />
+                                                            </CheckBox>
+                                                            <ui:Button
+                                                                Grid.Column="1"
+                                                                Content="⚡ Тест (5 сек)"
+                                                                ToolTip="Сжать 5-секундный отрезок из середины для быстрой проверки настроек"
+                                                                Appearance="Secondary"
+                                                                Command="{Binding GenerateQuickSampleCommand}"
+                                                                CommandParameter="{Binding SelectedItem}"
+                                                                IsEnabled="{Binding CanStart}"
+                                                                Padding="8,3"
+                                                                FontSize="11" />
+                                                        </Grid>
+
+                                                        <!-- Временной диапазон обрезки -->
+                                                        <StackPanel Visibility="{Binding SelectedItem.IsTrimEnabled, Converter={x:Static local:Converters.BoolToVisibleConverter}}" Margin="0,6,0,0">
+                                                            <TextBlock Text="Диапазон времени (ЧЧ:ММ:СС или ММ:СС):" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <StackPanel Grid.Column="0">
+                                                                    <TextBlock Text="Начало:" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,2" />
+                                                                    <ui:TextBox
+                                                                        Text="{Binding SelectedItem.TrimStart, UpdateSourceTrigger=PropertyChanged}"
+                                                                        FontFamily="Consolas"
+                                                                        FontSize="13"
+                                                                        TextAlignment="Center"
+                                                                        Padding="6,4" />
+                                                                </StackPanel>
+
+                                                                <TextBlock Grid.Column="1" Text="→" FontSize="16" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Bottom" Margin="8,0,8,6" />
+
+                                                                <StackPanel Grid.Column="2">
+                                                                    <TextBlock Text="Конец:" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,2" />
+                                                                    <ui:TextBox
+                                                                        Text="{Binding SelectedItem.TrimEnd, UpdateSourceTrigger=PropertyChanged}"
+                                                                        FontFamily="Consolas"
+                                                                        FontSize="13"
+                                                                        TextAlignment="Center"
+                                                                        Padding="6,4" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Результат и повторное сжатие -->
+                                                <StackPanel
+                                                    Margin="0,8,0,0"
+                                                    Visibility="{Binding SelectedItem.ResultDetails, Converter={x:Static local:Converters.NotNullToVisibleConverter}}">
+                                                    <TextBlock
+                                                        Text="{Binding SelectedItem.ResultDetails, StringFormat='Результат: {0}'}"
+                                                        FontSize="13"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="#6ccb5f"
+                                                        Margin="0,0,0,8" />
+                                                    <ui:Button
+                                                        Content="Сжать этот ролик повторно"
+                                                        Icon="{ui:SymbolIcon ArrowCounterclockwise24}"
+                                                        Appearance="Secondary"
+                                                        Command="{Binding RecompressItemCommand}"
+                                                        CommandParameter="{Binding SelectedItem}"
+                                                        IsEnabled="{Binding CanStart}"
+                                                        HorizontalAlignment="Left"
+                                                        Padding="12,6" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </ui:Card>
+
+                                    <!-- ПРАВАЯ КАРТОЧКА: НАСТРОЙКИ СЖАТИЯ -->
+                                     <ui:Card Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Stretch">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Margin="4">
+                                                <!-- Заголовок и выбор формата -->
+                                                <TextBlock
+                                                    Text="Параметры сжатия"
+                                                    FontSize="16"
+                                                    FontWeight="Bold"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    Margin="0,0,0,8" />
+
+                                                <!-- Выбор формата вывода -->
+                                                <Grid Margin="0,0,0,10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                        <TextBlock Text="Формат вывода" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                        <TextBlock Text="MP4 видео, GIF анимация или MP3 аудио" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <ComboBox
+                                                        Grid.Column="1"
+                                                        ItemsSource="{Binding ExportFormats}"
+                                                        SelectedItem="{Binding SelectedExportFormat, Mode=TwoWay}"
+                                                        Width="140"
+                                                        VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <!-- Сегментный переключатель режима: По качеству vs Точный размер -->
+                                                <Border
+                                                    Background="#12FFFFFF"
+                                                    BorderBrush="#18FFFFFF"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="3"
+                                                    Margin="0,0,0,12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <RadioButton
+                                                            Grid.Column="0"
+                                                            GroupName="CompressionModeGroup"
+                                                            IsChecked="{Binding IsTargetSizeMode, Converter={x:Static local:Converters.InverseBoolConverter}, Mode=TwoWay}"
+                                                            Style="{StaticResource SegmentedRadioStyle}">
+                                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <ui:SymbolIcon Symbol="Gauge24" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                                <TextBlock Text="По качеству" FontWeight="SemiBold" FontSize="13" />
+                                                            </StackPanel>
+                                                        </RadioButton>
+
+                                                        <RadioButton
+                                                            Grid.Column="1"
+                                                            GroupName="CompressionModeGroup"
+                                                            IsChecked="{Binding IsTargetSizeMode, Mode=TwoWay}"
+                                                            Style="{StaticResource SegmentedRadioStyle}">
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <ui:SymbolIcon Symbol="Target24" FontSize="16" Margin="0,0,6,0" Foreground="#6ccb5f" />
+                                                                <TextBlock Text="Точный размер" FontWeight="SemiBold" FontSize="13" />
+                                                            </StackPanel>
+                                                        </RadioButton>
+                                                    </Grid>
+                                                </Border>
+
+                                                <!-- РЕЖИМ 1: ПРЕСЕТЫ КАЧЕСТВА -->
+                                                <StackPanel Visibility="{Binding IsTargetSizeMode, Converter={x:Static local:Converters.InverseBoolToVisibleConverter}}">
+                                                    <TextBlock
+                                                        Text="Выберите предустановленный профиль:"
+                                                        FontSize="12"
+                                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                        Margin="0,0,0,8" />
+
+                                                    <ListBox
+                                                        ItemsSource="{Binding Profiles}"
+                                                        SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                                <Setter Property="Margin" Value="0,0,0,8" />
+                                                                <Setter Property="Padding" Value="0" />
+                                                                <Setter Property="Background" Value="Transparent" />
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <Border
+                                                                                x:Name="ItemBorder"
+                                                                                CornerRadius="10"
+                                                                                Padding="14,12"
+                                                                                Background="#10FFFFFF"
+                                                                                BorderBrush="#20FFFFFF"
+                                                                                BorderThickness="1"
+                                                                                Cursor="Hand">
+                                                                                <ContentPresenter />
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsSelected" Value="True">
+                                                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AppAccentSubtleBrush}" />
+                                                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+                                                                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="2" />
+                                                                                </Trigger>
+                                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#55FFFFFF" />
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                                                        <TextBlock
+                                                                            Text="{Binding Name}"
+                                                                            FontWeight="Bold"
+                                                                            FontSize="14"
+                                                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                                            Margin="0,0,0,4" />
+                                                                        <TextBlock
+                                                                            Text="{Binding Description}"
+                                                                            FontSize="12"
+                                                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                                            TextWrapping="Wrap" />
+                                                                    </StackPanel>
+
+                                                                    <Border
+                                                                        Grid.Column="1"
+                                                                        VerticalAlignment="Top"
+                                                                        Background="{DynamicResource AppAccentSubtleBrush}"
+                                                                        CornerRadius="6"
+                                                                        Padding="8,3">
+                                                                        <TextBlock
+                                                                            Text="{Binding Badge}"
+                                                                            FontSize="11"
+                                                                            FontWeight="SemiBold"
+                                                                            Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                                    </Border>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </StackPanel>
+
+                                                <!-- РЕЖИМ 2: ТОЧНЫЙ РАЗМЕР В МБ (Fit to MB) -->
+                                                <StackPanel Visibility="{Binding IsTargetSizeMode, Converter={x:Static local:Converters.BoolToVisibleConverter}}">
+                                                    <TextBlock
+                                                        Text="Лимит размера файла (МБ):"
+                                                        FontSize="12"
+                                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                        Margin="0,0,0,8" />
+
+                                                    <!-- Быстрые кнопки пресетов -->
+                                                    <Grid Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <ui:Button
+                                                            Grid.Column="0"
+                                                            Margin="0,0,4,0"
+                                                            Padding="2,8"
+                                                            HorizontalAlignment="Stretch"
+                                                            Command="{Binding SetTargetSizeCommand}"
+                                                            CommandParameter="10">
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="10 МБ" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Discord" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </ui:Button>
+
+                                                        <ui:Button
+                                                            Grid.Column="1"
+                                                            Margin="2,0,2,0"
+                                                            Padding="2,8"
+                                                            HorizontalAlignment="Stretch"
+                                                            Command="{Binding SetTargetSizeCommand}"
+                                                            CommandParameter="25">
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="25 МБ" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Nitro/Mail" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </ui:Button>
+
+                                                        <ui:Button
+                                                            Grid.Column="2"
+                                                            Margin="2,0,2,0"
+                                                            Padding="2,8"
+                                                            HorizontalAlignment="Stretch"
+                                                            Command="{Binding SetTargetSizeCommand}"
+                                                            CommandParameter="50">
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="50 МБ" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Telegram" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </ui:Button>
+
+                                                        <ui:Button
+                                                            Grid.Column="3"
+                                                            Margin="4,0,0,0"
+                                                            Padding="2,8"
+                                                            HorizontalAlignment="Stretch"
+                                                            Command="{Binding SetTargetSizeCommand}"
+                                                            CommandParameter="100">
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="100 МБ" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Большой" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </ui:Button>
+                                                    </Grid>
+
+                                                    <!-- Кастомный ввод размера -->
+                                                    <Border
+                                                        Background="#10FFFFFF"
+                                                        BorderBrush="#18FFFFFF"
+                                                        BorderThickness="1"
+                                                        CornerRadius="8"
+                                                        Padding="12,10"
+                                                        Margin="0,0,0,12">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="Точный вес видео" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Битрейт рассчитается автоматически" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <ui:TextBox
+                                                                    Text="{Binding TargetSizeMb, UpdateSourceTrigger=PropertyChanged}"
+                                                                    Width="72"
+                                                                    TextAlignment="Center"
+                                                                    FontWeight="Bold"
+                                                                    FontSize="15"
+                                                                    Padding="8,4" />
+                                                                <TextBlock
+                                                                    Text="МБ"
+                                                                    FontWeight="Bold"
+                                                                    FontSize="13"
+                                                                    VerticalAlignment="Center"
+                                                                    Margin="8,0,0,0"
+                                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ -->
+                                                <Border Margin="0,6,0,0" Padding="0,14,0,0" BorderBrush="#18FFFFFF" BorderThickness="0,1,0,0">
+                                                    <StackPanel>
+                                                        <TextBlock
+                                                            Text="Дополнительные параметры"
+                                                            FontSize="13"
+                                                            FontWeight="SemiBold"
+                                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                            Margin="0,0,0,10" />
+
+                                                        <!-- Видеокодек (H.264 / H.265 / AV1) -->
+                                                        <Grid Margin="0,0,0,10" Visibility="{Binding IsVideoExport, Converter={x:Static local:Converters.BoolToVisibleConverter}}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="Видеокодек" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="H.264 (совместимость), HEVC или AV1" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </StackPanel>
+                                                            <ComboBox
+                                                                Grid.Column="1"
+                                                                ItemsSource="{Binding VideoCodecs}"
+                                                                SelectedItem="{Binding SelectedVideoCodec, Mode=TwoWay}"
+                                                                Width="130"
+                                                                VerticalAlignment="Center" />
+                                                        </Grid>
+
+                                                        <!-- Разрешение видео -->
+                                                        <Grid Margin="0,0,0,10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="Разрешение видео" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Пропорционально уменьшает размер кадра" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </StackPanel>
+                                                            <ComboBox
+                                                                Grid.Column="1"
+                                                                ItemsSource="{Binding Resolutions}"
+                                                                SelectedItem="{Binding SelectedResolution, Mode=TwoWay}"
+                                                                Width="130"
+                                                                VerticalAlignment="Center" />
+                                                        </Grid>
+
+                                                        <!-- Частота кадров (FPS) -->
+                                                        <Grid Margin="0,0,0,10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="Частота кадров (FPS)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Ограничение или увеличение числа кадров" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </StackPanel>
+                                                            <ComboBox
+                                                                Grid.Column="1"
+                                                                ItemsSource="{Binding FpsOptions}"
+                                                                SelectedItem="{Binding SelectedFps, Mode=TwoWay}"
+                                                                Width="130"
+                                                                VerticalAlignment="Center" />
+                                                        </Grid>
+
+                                                        <!-- Поле ввода своего значения FPS -->
+                                                        <Border
+                                                            Visibility="{Binding IsCustomFps, Converter={x:Static local:Converters.BoolToVisibleConverter}}"
+                                                            Background="#10FFFFFF"
+                                                            BorderBrush="#18FFFFFF"
+                                                            BorderThickness="1"
+                                                            CornerRadius="8"
+                                                            Padding="10,8"
+                                                            Margin="0,0,0,10">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                                    <TextBlock Text="Своя частота кадров" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                    <TextBlock Text="Например: 144, 90, 75, 45, 20..." FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <ui:TextBox
+                                                                        Text="{Binding CustomFps, UpdateSourceTrigger=PropertyChanged}"
+                                                                        Width="64"
+                                                                        TextAlignment="Center"
+                                                                        FontWeight="Bold"
+                                                                        FontSize="14"
+                                                                        Padding="6,3" />
+                                                                    <TextBlock
+                                                                        Text="FPS"
+                                                                        FontWeight="Bold"
+                                                                        FontSize="12"
+                                                                        VerticalAlignment="Center"
+                                                                        Margin="6,0,0,0"
+                                                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <!-- Плавная интерполяция кадров (minterpolate) -->
+                                                        <CheckBox
+                                                            IsChecked="{Binding UseInterpolation, Mode=TwoWay}"
+                                                            Margin="0,0,0,10"
+                                                            VerticalContentAlignment="Center">
+                                                            <StackPanel Margin="4,0,0,0">
+                                                                <TextBlock Text="Интерполяция кадров (minterpolate)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Генерирует новые промежуточные кадры (супер-плавное видео)" FontSize="11" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                            </StackPanel>
+                                                        </CheckBox>
+
+                                                        <!-- Без звука -->
+                                                        <CheckBox
+                                                            IsChecked="{Binding IsMuteAudio, Mode=TwoWay}"
+                                                            Margin="0,0,0,10"
+                                                            VerticalContentAlignment="Center">
+                                                            <StackPanel Margin="4,0,0,0">
+                                                                <TextBlock Text="Без звука (удалить аудио)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="Для мемов, анимаций или максимального сжатия" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </StackPanel>
+                                                        </CheckBox>
+
+                                                        <!-- Аппаратное ускорение (GPU) -->
+                                                        <CheckBox
+                                                            IsChecked="{Binding UseGpuAcceleration, Mode=TwoWay}"
+                                                            Margin="0,0,0,4"
+                                                            VerticalContentAlignment="Center">
+                                                            <StackPanel Margin="4,0,0,0">
+                                                                <TextBlock Text="Аппаратное ускорение (GPU)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <TextBlock Text="{Binding GpuStatusText}" FontSize="11" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                                            </StackPanel>
+                                                        </CheckBox>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </ui:Card>
+                                </Grid>
+
+                                <!-- НИЖНЯЯ ПАНЕЛЬ ДЕЙСТВИЙ -->
+                                <ui:Card Grid.Row="2" Padding="16,14">
+                                    <StackPanel>
+                                        <ProgressBar
+                                            Height="8"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="{Binding CurrentProgress}"
+                                            Margin="0,0,0,12" />
+
+                                        <Grid>
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,250,0">
+                                                <TextBlock
+                                                    Text="{Binding StatusMessage}"
+                                                    FontWeight="SemiBold"
+                                                    FontSize="13"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Text="{Binding ProgressDetails}"
+                                                    FontSize="11"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                    FontFamily="Consolas"
+                                                    Margin="0,2,0,0" />
+                                            </StackPanel>
+
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <ui:Button
+                                                    Content="{Binding StartButtonText}"
+                                                    Icon="{ui:SymbolIcon Play24}"
+                                                    Appearance="Primary"
+                                                    Command="{Binding StartCompressionCommand}"
+                                                    IsEnabled="{Binding CanStart}"
+                                                    Padding="22,10"
+                                                    FontWeight="Bold"
+                                                    FontSize="14"
+                                                    Margin="0,0,8,0" />
+
+                                                <ui:Button
+                                                    Content="Отмена"
+                                                    Icon="{ui:SymbolIcon Stop24}"
+                                                    Appearance="Danger"
+                                                    Command="{Binding CancelCompressionCommand}"
+                                                    IsEnabled="{Binding IsCompressing}"
+                                                    Padding="12,10"
+                                                    Margin="0,0,8,0" />
+
+                                                <ui:Button
+                                                    Content="Папка"
+                                                    Icon="{ui:SymbolIcon Folder24}"
+                                                    Appearance="Secondary"
+                                                    Command="{Binding OpenOutputFolderCommand}"
+                                                    Padding="12,10" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </ui:Card>
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ===================================================================== -->
+                    <!-- ВКЛАДКА 1: ОЧЕРЕДЬ ФАЙЛОВ (ПАКЕТ) -->
+                    <!-- ===================================================================== -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <ui:Card Grid.Row="0" Margin="0,0,0,12">
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ui:Button
+                                            Content="Добавить файлы..."
+                                            Icon="{ui:SymbolIcon Add24}"
+                                            Appearance="Primary"
+                                            Click="PickFilesButton_Click"
+                                            Margin="0,0,8,0" />
+                                        <ui:Button
+                                            Content="Сжать всю очередь"
+                                            Icon="{ui:SymbolIcon Play24}"
+                                            Command="{Binding StartCompressionCommand}"
+                                            IsEnabled="{Binding CanStart}"
+                                            Margin="0,0,8,0" />
+                                        <ui:Button
+                                            Content="Сжать всё заново"
+                                            Icon="{ui:SymbolIcon ArrowCounterclockwise24}"
+                                            Appearance="Secondary"
+                                            Command="{Binding RecompressAllCommand}"
+                                            IsEnabled="{Binding CanStart}"
+                                            Margin="0,0,8,0" />
+                                        <ui:Button
+                                            Content="Очистить"
+                                            Icon="{ui:SymbolIcon Delete24}"
+                                            Appearance="Transparent"
+                                            Command="{Binding ClearQueueCommand}"
+                                            IsEnabled="{Binding CanStart}" />
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Text="{Binding Queue.Count, StringFormat='Всего в очереди: {0} видео'}"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </ui:Card>
+
+                            <ListView
+                                Grid.Row="1"
+                                ItemsSource="{Binding Queue}"
+                                SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                Background="Transparent"
+                                BorderThickness="0">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border
+                                            Margin="0,0,0,6"
+                                            Padding="12,10"
+                                            Background="#12FFFFFF"
+                                            BorderBrush="#20FFFFFF"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="140" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <ui:SymbolIcon Grid.Column="0" Symbol="Video24" FontSize="26" Margin="0,0,14,0" Foreground="{DynamicResource AppAccentHighlightBrush}" VerticalAlignment="Center" />
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding FileSizeFormatted}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                                    <ProgressBar
+                                                        Height="6"
+                                                        Width="110"
+                                                        Minimum="0"
+                                                        Maximum="100"
+                                                        Value="{Binding Progress}"
+                                                        Visibility="{Binding IsProcessing, Converter={x:Static local:Converters.BoolToVisibleConverter}}" />
+                                                </StackPanel>
+
+                                                <TextBlock
+                                                    Grid.Column="3"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Center"
+                                                    Text="{Binding ResultDetails}"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="#6ccb5f"
+                                                    FontSize="12" />
+
+                                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <ui:Button
+                                                        Icon="{ui:SymbolIcon ArrowCounterclockwise24}"
+                                                        Appearance="Transparent"
+                                                        Command="{Binding DataContext.RecompressItemCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Сжать этот файл заново с текущими настройками"
+                                                        Margin="0,0,4,0" />
+
+                                                    <ui:Button
+                                                        Icon="{ui:SymbolIcon Dismiss24}"
+                                                        Appearance="Transparent"
+                                                        Command="{Binding DataContext.RemoveQueueItemCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Удалить из очереди" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- ===================================================================== -->
+                    <!-- ВКЛАДКА 2: НАСТРОЙКИ И КАСТОМИЗАЦИЯ ТЕМ -->
+                    <!-- ===================================================================== -->
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel MaxWidth="780" HorizontalAlignment="Left" Margin="0,0,10,20">
+                                <TextBlock Text="Параметры и оформление" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,16" />
+
+                                <!-- КАРТОЧКА: КАСТОМИЗАЦИЯ ТЕМЫ И АКЦЕНТА -->
+                                <ui:Card Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Внешний вид и цветовая тема" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock Text="Выберите тему интерфейса, эффект прозрачности и любимый акцентный цвет:" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,14" />
+
+                                        <!-- Переключатель режима темы -->
+                                        <TextBlock Text="Режим оформления:" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                            <ui:Button
+                                                Content="🌙 Тёмная тема"
+                                                Command="{Binding SetThemeCommand}"
+                                                CommandParameter="Dark"
+                                                Margin="0,0,8,0" />
+                                            <ui:Button
+                                                Content="☀️ Светлая тема"
+                                                Command="{Binding SetThemeCommand}"
+                                                CommandParameter="Light"
+                                                Margin="0,0,8,0" />
+                                            <ui:Button
+                                                Content="💻 Высокий контраст"
+                                                Command="{Binding SetThemeCommand}"
+                                                CommandParameter="HighContrast" />
+                                        </StackPanel>
+
+                                        <!-- Выбор акцентного цвета -->
+                                        <TextBlock Text="Акцентный цвет интерфейса:" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8" />
+                                        <ItemsControl ItemsSource="{Binding AccentColors}" Margin="0,0,0,16">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button
+                                                        Command="{Binding DataContext.SetAccentColorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding Hex}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Padding="4"
+                                                        Margin="0,0,8,8"
+                                                        Cursor="Hand">
+                                                        <Border
+                                                            Width="38"
+                                                            Height="38"
+                                                            CornerRadius="19"
+                                                            Background="{Binding Brush}"
+                                                            BorderBrush="#40FFFFFF"
+                                                            BorderThickness="2"
+                                                            ToolTip="{Binding Name}">
+                                                            <ui:SymbolIcon
+                                                                Symbol="Checkmark24"
+                                                                FontSize="16"
+                                                                Foreground="#FFFFFF"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"
+                                                                Visibility="{Binding IsSelected, Converter={x:Static local:Converters.BoolToVisibleConverter}}" />
+                                                        </Border>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!-- Кастомный ввод HEX-цвета -->
+                                        <Border
+                                            Background="#0CFFFFFF"
+                                            BorderBrush="#18FFFFFF"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12,10"
+                                            Margin="0,0,0,16">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="Свой цвет (HEX)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    <TextBlock Text="Любой шестнадцатеричный код (например, #FF007F или #00D2FF)" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border
+                                                        Width="28"
+                                                        Height="28"
+                                                        CornerRadius="14"
+                                                        Background="{Binding CustomAccentHexInput, Converter={x:Static local:Converters.HexToBrushConverter}}"
+                                                        BorderBrush="#50FFFFFF"
+                                                        BorderThickness="1.5"
+                                                        Margin="0,0,8,0"
+                                                        VerticalAlignment="Center" />
+                                                    <ui:TextBox
+                                                        Text="{Binding CustomAccentHexInput, UpdateSourceTrigger=PropertyChanged}"
+                                                        Width="96"
+                                                        FontWeight="Bold"
+                                                        FontSize="13"
+                                                        Padding="8,5"
+                                                        Margin="0,0,8,0"
+                                                        VerticalAlignment="Center" />
+                                                    <ui:Button
+                                                        Content="Применить"
+                                                        Appearance="Primary"
+                                                        Command="{Binding ApplyCustomHexColorCommand}"
+                                                        Padding="12,6"
+                                                        VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Эффект подложки окна -->
+                                        <TextBlock Text="Эффект окна (Backdrop):" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:Button
+                                                Content="Mica (Слюда Windows 11)"
+                                                Command="{Binding SetBackdropCommand}"
+                                                CommandParameter="Mica"
+                                                Margin="0,0,8,0" />
+                                            <ui:Button
+                                                Content="Acrylic (Размытие)"
+                                                Command="{Binding SetBackdropCommand}"
+                                                CommandParameter="Acrylic"
+                                                Margin="0,0,8,0" />
+                                            <ui:Button
+                                                Content="Сплошной фон"
+                                                Command="{Binding SetBackdropCommand}"
+                                                CommandParameter="None" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ui:Card>
+
+                                <!-- КАРТОЧКА: ПОВЕДЕНИЕ И РАБОЧИЙ ПРОЦЕСС -->
+                                <ui:Card Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Поведение и рабочий процесс" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock Text="Настройки уведомлений, папок и автоматизации при завершении сжатия:" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,14" />
+
+                                        <!-- Звуковой сигнал -->
+                                        <CheckBox
+                                            IsChecked="{Binding PlaySoundOnComplete, Mode=TwoWay}"
+                                            Margin="0,0,0,10"
+                                            VerticalContentAlignment="Center">
+                                            <StackPanel Margin="4,0,0,0">
+                                                <TextBlock Text="Звуковое оповещение при завершении" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="Воспроизводить системный звук по окончании сжатия всех роликов" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </CheckBox>
+
+                                        <!-- Автоматически открывать папку -->
+                                        <CheckBox
+                                            IsChecked="{Binding AutoOpenFolderOnComplete, Mode=TwoWay}"
+                                            Margin="0,0,0,10"
+                                            VerticalContentAlignment="Center">
+                                            <StackPanel Margin="4,0,0,0">
+                                                <TextBlock Text="Автоматически открывать папку с готовыми файлами" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="Сразу открывает Проводник Windows с полученными роликами" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </CheckBox>
+
+                                        <!-- Авто-очистка очереди -->
+                                        <CheckBox
+                                            IsChecked="{Binding AutoClearCompleted, Mode=TwoWay}"
+                                            Margin="0,0,0,14"
+                                            VerticalContentAlignment="Center">
+                                            <StackPanel Margin="4,0,0,0">
+                                                <TextBlock Text="Очищать завершенные файлы из очереди" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="Успешно сжатые файлы автоматически исчезают из списка" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </CheckBox>
+
+                                        <!-- Суффикс файла -->
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="Суффикс имени готового файла" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="Добавляется в конец файла (например: _compressed, _small, _low)" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <ui:TextBox
+                                                Grid.Column="1"
+                                                Text="{Binding OutputFileSuffix, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="140"
+                                                FontWeight="SemiBold"
+                                                FontSize="13"
+                                                Padding="10,6"
+                                                VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <!-- Действие после завершения -->
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="Действие после завершения" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="Автоматическое действие по окончании всей очереди файлов" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <ComboBox
+                                                Grid.Column="1"
+                                                ItemsSource="{Binding CompletionActions}"
+                                                SelectedItem="{Binding CompletionAction, Mode=TwoWay}"
+                                                Width="160"
+                                                VerticalAlignment="Center" />
+                                        </Grid>
+                                    </StackPanel>
+                                </ui:Card>
+
+                                <!-- КАРТОЧКА: FFMPEG -->
+                                <ui:Card Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Движок FFmpeg" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock
+                                            Text="{Binding FfmpegStatusText}"
+                                            FontSize="13"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap"
+                                            Margin="0,0,0,12" />
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <ui:Button
+                                                Content="Скачать / Обновить FFmpeg"
+                                                Icon="{ui:SymbolIcon ArrowDownload24}"
+                                                Appearance="Primary"
+                                                Command="{Binding DownloadFfmpegCommand}"
+                                                IsEnabled="{Binding IsDownloading, Converter={x:Static local:Converters.InverseBoolConverter}}"
+                                                Margin="0,0,10,0" />
+
+                                            <ui:Button
+                                                Content="{Binding IsInPath, Converter={x:Static local:Converters.PathButtonTextConverter}}"
+                                                Icon="{ui:SymbolIcon Checkmark24}"
+                                                Appearance="Secondary"
+                                                Command="{Binding ToggleAddToPathCommand}" />
+                                        </StackPanel>
+
+                                        <ProgressBar
+                                            Height="8"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="{Binding DownloadProgress}"
+                                            Visibility="{Binding IsDownloading, Converter={x:Static local:Converters.BoolToVisibleConverter}}"
+                                            Margin="0,0,0,6" />
+
+                                        <TextBlock
+                                            Text="{Binding DownloadStatusText}"
+                                            FontSize="12"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                            Visibility="{Binding IsDownloading, Converter={x:Static local:Converters.BoolToVisibleConverter}}" />
+                                    </StackPanel>
+                                </ui:Card>
+
+                                <!-- КАРТОЧКА: КАСТОМНЫЙ ПУТЬ -->
+                                <ui:Card Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock Text="Кастомный путь к ffmpeg.exe" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock Text="Если у вас уже установлен FFmpeg в другой папке, укажите путь к нему:" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <ui:TextBox
+                                                Text="{Binding CustomFfmpegPath, UpdateSourceTrigger=PropertyChanged}"
+                                                VerticalContentAlignment="Center"
+                                                Padding="10,6"
+                                                PlaceholderText="C:\path\to\ffmpeg.exe" />
+
+                                            <ui:Button
+                                                Grid.Column="1"
+                                                Margin="8,0,0,0"
+                                                Content="Обзор..."
+                                                Icon="{ui:SymbolIcon FolderOpen24}"
+                                                Command="{Binding BrowseCustomFfmpegCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </ui:Card>
+
+                                <!-- КАРТОЧКА: О ПРОГРАММЕ -->
+                                <ui:Card>
+                                    <StackPanel>
+                                        <TextBlock Text="О программе LowSizeMp4" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock Text="Версия 2.0 (WPF .NET 9 + WPF-UI 4.3)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                                        <TextBlock Text="Современный легковесный компрессор видео с поддержкой H.264/H.265 и идеальной совместимостью со всеми плеерами и смартфонами." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </ui:Card>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ===================================================================== -->
+                    <!-- ВКЛАДКА 3: ЛОГ FFMPEG -->
+                    <!-- ===================================================================== -->
+                    <TabItem>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <ui:Card Grid.Row="0" Margin="0,0,0,8">
+                                <Grid>
+                                    <TextBlock Text="Консольный вывод процесса FFmpeg" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <ui:Button
+                                            Content="Копировать лог"
+                                            Icon="{ui:SymbolIcon DocumentCopy24}"
+                                            Command="{Binding CopyLogsCommand}"
+                                            Margin="0,0,8,0" />
+                                        <ui:Button
+                                            Content="Очистить"
+                                            Icon="{ui:SymbolIcon Delete24}"
+                                            Appearance="Transparent"
+                                            Command="{Binding ClearLogsCommand}" />
+                                    </StackPanel>
+                                </Grid>
+                            </ui:Card>
+
+                            <Border
+                                Grid.Row="1"
+                                CornerRadius="8"
+                                Background="#0A0A0A"
+                                BorderBrush="#25FFFFFF"
+                                BorderThickness="1">
+                                <TextBox
+                                    x:Name="LogTextBox"
+                                    Text="{Binding LogText, Mode=OneWay}"
+                                    IsReadOnly="True"
+                                    FontFamily="Consolas"
+                                    FontSize="12"
+                                    Background="Transparent"
+                                    Foreground="#EEEEEE"
+                                    BorderThickness="0"
+                                    Padding="14"
+                                    VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    TextWrapping="NoWrap"
+                                    TextChanged="LogTextBox_TextChanged" />
+                            </Border>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
