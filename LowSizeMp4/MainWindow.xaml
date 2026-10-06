@@ -126,7 +126,7 @@
                                     FontWeight="Bold"
                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                 <Border Background="{DynamicResource AppAccentSubtleBrush}" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="v2.0" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AppAccentHighlightBrush}" />
+                                    <TextBlock Text="v2.5" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AppAccentHighlightBrush}" />
                                 </Border>
                             </StackPanel>
                             <TextBlock
