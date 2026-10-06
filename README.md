@@ -80,7 +80,6 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 * **Интерфейс:** [WPF-UI 4.3](https://github.com/lepoco/wpfui) (Windows 11 Fluent Design)
 * **Архитектура:** [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)
 * **Медиа-движок:** [FFmpeg](https://ffmpeg.org/) & [FFprobe](https://ffmpeg.org/ffprobe.html)
-* **Тесты:** xUnit (.NET 9)
 
 ---
 
