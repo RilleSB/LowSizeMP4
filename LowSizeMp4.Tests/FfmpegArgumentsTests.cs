@@ -5,6 +5,13 @@ namespace LowSizeMp4.Tests;
 
 public class FfmpegArgumentsTests
 {
+    [Fact]
+    public void ValidateSymbols()
+    {
+        var symbols = new[] { "ArrowUpload24", "Checkmark24", "Code24", "Gauge24", "Image24", "MusicNote224", "Settings24", "Target24", "TaskListSquareLtr24", "Video24" };
+        var invalid = symbols.Where(s => !Enum.IsDefined(typeof(Wpf.Ui.Controls.SymbolRegular), s)).ToList();
+        Assert.Empty(invalid);
+    }
     private readonly FfmpegService _service = new();
     private readonly FfmpegService.GpuEncoderInfo _cpuOnlyGpu = new(false, false, false, "libx264", "libx265", null);
 
