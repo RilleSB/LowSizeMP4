@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
     private string _currentEtaText = string.Empty;
     private CancellationTokenSource? _compressionCts;
     private bool _hasNewLogs;
+    private readonly SemaphoreSlim _probeSemaphore = new(3, 3);
 
     public ObservableCollection<QueueItem> Queue { get; } = new();
 
@@ -239,18 +240,33 @@ public partial class MainViewModel : ObservableObject
     private string _selectedExportFormat = "MP4 Видео";
 
     [ObservableProperty]
+    private string _selectedAudioBitrate = "192 kbps";
+
+    [ObservableProperty]
     private string _completionAction = "Ничего не делать";
 
     public bool IsVideoExport => SelectedExportFormat == "MP4 Видео";
+    public bool IsGifExport => SelectedExportFormat == "GIF Анимация";
+    public bool IsAudioExport => SelectedExportFormat == "MP3 Аудио";
 
     partial void OnSelectedVideoCodecChanged(string value) => SaveSettings();
+    partial void OnSelectedAudioBitrateChanged(string value) => SaveSettings();
     partial void OnSelectedExportFormatChanged(string value)
     {
         OnPropertyChanged(nameof(IsVideoExport));
+        OnPropertyChanged(nameof(IsGifExport));
+        OnPropertyChanged(nameof(IsAudioExport));
         UpdateAllOutputPaths();
         SaveSettings();
     }
     partial void OnCompletionActionChanged(string value) => SaveSettings();
+
+    public ObservableCollection<string> AudioBitrates { get; } = new()
+    {
+        "128 kbps",
+        "192 kbps",
+        "320 kbps"
+    };
 
     public ObservableCollection<string> VideoCodecs { get; } = new()
     {
@@ -330,6 +346,7 @@ public partial class MainViewModel : ObservableObject
         _customFfmpegPath = settings.CustomFfmpegPath ?? string.Empty;
         _selectedVideoCodec = settings.VideoCodec ?? "H.264 (AVC)";
         _selectedExportFormat = settings.ExportFormat ?? "MP4 Видео";
+        _selectedAudioBitrate = settings.AudioBitrate ?? "192 kbps";
         _completionAction = settings.CompletionAction ?? "Ничего не делать";
 
         var matchingProfile = SettingsService.ResolveProfile(settings.LastPresetName, Profiles);
@@ -392,6 +409,7 @@ public partial class MainViewModel : ObservableObject
             AutoClearCompleted = AutoClearCompleted,
             VideoCodec = SelectedVideoCodec,
             ExportFormat = SelectedExportFormat,
+            AudioBitrate = SelectedAudioBitrate,
             CompletionAction = CompletionAction,
             CustomOutputFolder = CustomOutputFolder,
             CustomFfmpegPath = CustomFfmpegPath
@@ -478,12 +496,14 @@ public partial class MainViewModel : ObservableObject
             Queue.Add(item);
             SelectedItem ??= item;
 
-            // Асинхронно извлекаем превью и длительность
+            // Асинхронно извлекаем превью, длительность и реальное разрешение с ограничением нагрузки
             _ = Task.Run(async () =>
             {
+                await _probeSemaphore.WaitAsync();
                 try
                 {
                     var dur = await _ffmpeg.TryGetDurationSecondsAsync(path, CancellationToken.None);
+                    var res = await _ffmpeg.TryGetVideoResolutionAsync(path, CancellationToken.None);
                     var thumb = await _ffmpeg.GenerateThumbnailAsync(path, CancellationToken.None);
 
                     Application.Current?.Dispatcher.Invoke(() =>
@@ -500,6 +520,11 @@ public partial class MainViewModel : ObservableObject
                             item.DurationFormatted = "—";
                         }
 
+                        if (!string.IsNullOrEmpty(res))
+                        {
+                            item.ResolutionFormatted = res;
+                        }
+
                         if (!string.IsNullOrEmpty(thumb))
                         {
                             item.ThumbnailPath = thumb;
@@ -508,6 +533,10 @@ public partial class MainViewModel : ObservableObject
                 }
                 catch
                 {
+                }
+                finally
+                {
+                    _probeSemaphore.Release();
                 }
             });
         }
@@ -677,7 +706,8 @@ public partial class MainViewModel : ObservableObject
                     UseGpuAcceleration,
                     _gpuInfo ?? new FfmpegService.GpuEncoderInfo(false, false, false, "libx264", "libx265", null),
                     SelectedVideoCodec,
-                    SelectedExportFormat);
+                    SelectedExportFormat,
+                    SelectedAudioBitrate);
 
                 AppendLogLine($"Параметры запуска: {args}");
                 var result = await _ffmpeg.CompressAsync(
@@ -868,7 +898,8 @@ public partial class MainViewModel : ObservableObject
                 UseGpuAcceleration,
                 _gpuInfo ?? new FfmpegService.GpuEncoderInfo(false, false, false, "libx264", "libx265", null),
                 SelectedVideoCodec,
-                SelectedExportFormat);
+                SelectedExportFormat,
+                SelectedAudioBitrate);
 
             var result = await _ffmpeg.CompressAsync(
                 item.FilePath,
@@ -1054,6 +1085,8 @@ public partial class MainViewModel : ObservableObject
     {
         foreach (var item in Queue)
         {
+            if (item.IsCompleted) continue;
+
             var dir = !string.IsNullOrWhiteSpace(CustomOutputFolder)
                 ? CustomOutputFolder
                 : Path.GetDirectoryName(item.FilePath)!;
