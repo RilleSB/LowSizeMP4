@@ -294,15 +294,36 @@ public sealed class FfmpegService
         bool useGpu,
         GpuEncoderInfo gpuInfo,
         string videoCodec = "H.264 (AVC)",
-        string exportFormat = "MP4 Видео")
+        string exportFormat = "MP4 Видео",
+        string audioBitrate = "192 kbps")
     {
         // 1. Экспорт в GIF
         if (string.Equals(exportFormat, "GIF Анимация", StringComparison.OrdinalIgnoreCase))
         {
-            var filters = new List<string> { "fps=15" };
-            if (resolution == "720p") filters.Add("scale=-2:min(720\\,ih):flags=lanczos");
+            var filters = new List<string>();
+            if (resolution == "1080p") filters.Add("scale=-2:min(1080\\,ih):flags=lanczos");
+            else if (resolution == "720p") filters.Add("scale=-2:min(720\\,ih):flags=lanczos");
             else if (resolution == "480p") filters.Add("scale=-2:min(480\\,ih):flags=lanczos");
-            else filters.Add("scale=-2:min(480\\,ih):flags=lanczos");
+            else filters.Add("scale=-2:min(720\\,ih):flags=lanczos");
+
+            int gifFps = 15;
+            if (!string.IsNullOrWhiteSpace(fps) && !fps.Equals("Оригинал", StringComparison.OrdinalIgnoreCase))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(fps, @"\d+");
+                if (match.Success && int.TryParse(match.Value, out var parsedFps) && parsedFps > 0)
+                {
+                    gifFps = Math.Clamp(parsedFps, 1, 60);
+                }
+            }
+
+            if (useInterpolation)
+            {
+                filters.Add($"minterpolate=fps={gifFps}:mi_mode=mci");
+            }
+            else
+            {
+                filters.Add($"fps={gifFps}");
+            }
 
             var filterStr = string.Join(",", filters);
             return $"-vf \"{filterStr},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer\" -loop 0";
@@ -311,7 +332,13 @@ public sealed class FfmpegService
         // 2. Экспорт только звука в MP3
         if (string.Equals(exportFormat, "MP3 Аудио", StringComparison.OrdinalIgnoreCase))
         {
-            return "-vn -c:a libmp3lame -b:a 192k";
+            int kbps = 192;
+            var match = System.Text.RegularExpressions.Regex.Match(audioBitrate, @"\d+");
+            if (match.Success && int.TryParse(match.Value, out var parsed))
+            {
+                kbps = parsed;
+            }
+            return $"-vn -c:a libmp3lame -b:a {kbps}k";
         }
 
         var sb = new StringBuilder();
@@ -396,44 +423,54 @@ public sealed class FfmpegService
             {
                 if (useGpu && !string.IsNullOrEmpty(gpuInfo.PreferredAv1Encoder))
                 {
-                    sb.Append($"-c:v {gpuInfo.PreferredAv1Encoder} -cq 28 ");
+                    if (gpuInfo.HasNvidia)
+                        sb.Append($"-c:v av1_nvenc -rc:v vbr -cq:v {profile.GpuQualityLevel} -preset p5 ");
+                    else if (gpuInfo.HasIntel)
+                        sb.Append($"-c:v av1_qsv -global_quality {profile.GpuQualityLevel} -preset medium ");
+                    else if (gpuInfo.HasAmd)
+                        sb.Append($"-c:v av1_amf -rc cqp -qp_p {profile.GpuQualityLevel} -quality quality ");
+                    else
+                        sb.Append($"-c:v {gpuInfo.PreferredAv1Encoder} -cq {profile.GpuQualityLevel} ");
                 }
                 else
                 {
-                    sb.Append("-c:v libsvtav1 -preset 6 -crf 28 ");
+                    sb.Append($"-c:v libsvtav1 -crf {profile.Av1Crf} -preset {profile.Av1CpuPreset} ");
                 }
             }
-            else if (isHevc || profile.Arguments.Contains("libx265"))
+            else if (isHevc)
             {
                 if (useGpu && (gpuInfo.HasNvidia || gpuInfo.HasIntel || gpuInfo.HasAmd))
                 {
-                    sb.Append($"-c:v {gpuInfo.PreferredHevcEncoder} -cq 28 -tag:v hvc1 ");
+                    if (gpuInfo.HasNvidia)
+                        sb.Append($"-c:v hevc_nvenc -rc:v vbr -cq:v {profile.GpuQualityLevel} -preset p5 -tag:v hvc1 ");
+                    else if (gpuInfo.HasIntel)
+                        sb.Append($"-c:v hevc_qsv -global_quality {profile.GpuQualityLevel} -preset medium -tag:v hvc1 ");
+                    else if (gpuInfo.HasAmd)
+                        sb.Append($"-c:v hevc_amf -rc cqp -qp_p {profile.GpuQualityLevel} -quality quality -tag:v hvc1 ");
+                    else
+                        sb.Append($"-c:v {gpuInfo.PreferredHevcEncoder} -cq {profile.GpuQualityLevel} -tag:v hvc1 ");
                 }
                 else
                 {
-                    sb.Append("-c:v libx265 -preset medium -crf 28 -tag:v hvc1 ");
+                    sb.Append($"-c:v libx265 -crf {profile.HevcCrf} -preset {profile.CpuPreset} -tag:v hvc1 ");
                 }
             }
             else
             {
                 if (useGpu && (gpuInfo.HasNvidia || gpuInfo.HasIntel || gpuInfo.HasAmd))
                 {
-                    sb.Append($"-c:v {gpuInfo.PreferredH264Encoder} -cq 23 ");
+                    if (gpuInfo.HasNvidia)
+                        sb.Append($"-c:v h264_nvenc -rc:v vbr -cq:v {profile.GpuQualityLevel} -preset p5 ");
+                    else if (gpuInfo.HasIntel)
+                        sb.Append($"-c:v h264_qsv -global_quality {profile.GpuQualityLevel} -preset medium ");
+                    else if (gpuInfo.HasAmd)
+                        sb.Append($"-c:v h264_amf -rc cqp -qp_p {profile.GpuQualityLevel} -quality quality ");
+                    else
+                        sb.Append($"-c:v {gpuInfo.PreferredH264Encoder} -cq {profile.GpuQualityLevel} ");
                 }
                 else
                 {
-                    if (profile.Arguments.Contains("-crf 19"))
-                    {
-                        sb.Append("-c:v libx264 -preset slow -crf 19 ");
-                    }
-                    else if (profile.Arguments.Contains("-crf 26"))
-                    {
-                        sb.Append("-c:v libx264 -preset faster -crf 26 ");
-                    }
-                    else
-                    {
-                        sb.Append("-c:v libx264 -preset medium -crf 23 ");
-                    }
+                    sb.Append($"-c:v libx264 -crf {profile.H264Crf} -preset {profile.CpuPreset} ");
                 }
             }
         }
@@ -538,6 +575,50 @@ public sealed class FfmpegService
         {
             return null;
         }
+    }
+
+    public async Task<string?> TryGetVideoResolutionAsync(string inputPath, CancellationToken cancellationToken)
+    {
+        var resolvedFfprobe = ResolveExecutablePath(FfprobePath);
+        if (resolvedFfprobe is null)
+        {
+            return null;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = resolvedFfprobe,
+            Arguments = $"-v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 \"{inputPath}\"",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return null;
+            }
+
+            var outTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+            await Task.WhenAll(process.WaitForExitAsync(cancellationToken), outTask, errTask);
+
+            var text = (await outTask).Trim();
+            if (!string.IsNullOrWhiteSpace(text) && text.Contains('x'))
+            {
+                return text;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
     }
 
     public string? ResolveExecutablePath(string executableName)

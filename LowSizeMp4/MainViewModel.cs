@@ -28,25 +28,49 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<CompressionProfile> Profiles { get; } = new()
     {
         new(
-            "Баланс H.264 (Рекомендуется)",
-            "Универсальный",
-            "Оптимальный баланс размера и качества. Воспроизводится абсолютно на любых устройствах.",
-            "-c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -map 0:v:0 -map 0:a? -sn"),
+            "balance",
+            "Оптимальный (Баланс)",
+            "Рекомендуется",
+            "Оптимальный баланс размера и качества для большинства повседневных видео.",
+            H264Crf: 23,
+            HevcCrf: 26,
+            Av1Crf: 28,
+            CpuPreset: "medium",
+            Av1CpuPreset: "6",
+            GpuQualityLevel: 23),
         new(
-            "Сильное сжатие H.265 (HEVC)",
-            "Макс. сжатие",
-            "Уменьшает вес до 60-80% сильнее H.264. Совместим с современными ПК и смартфонами.",
-            "-c:v libx265 -preset medium -crf 28 -tag:v hvc1 -c:a aac -b:a 96k -pix_fmt yuv420p -movflags +faststart -map 0:v:0 -map 0:a? -sn"),
+            "max_compression",
+            "Максимальное сжатие",
+            "Мин. размер",
+            "Максимальная экономия дискового пространства за счёт чуть более долгого сжатия.",
+            H264Crf: 28,
+            HevcCrf: 30,
+            Av1Crf: 32,
+            CpuPreset: "slow",
+            Av1CpuPreset: "5",
+            GpuQualityLevel: 28),
         new(
-            "Высокое качество H.264",
+            "high_quality",
+            "Высокое качество",
             "Без потерь",
             "Минимум визуальных потерь для важных записей и архива.",
-            "-c:v libx264 -preset slow -crf 19 -c:a aac -b:a 192k -pix_fmt yuv420p -movflags +faststart -map 0:v:0 -map 0:a? -sn"),
+            H264Crf: 19,
+            HevcCrf: 22,
+            Av1Crf: 24,
+            CpuPreset: "slow",
+            Av1CpuPreset: "5",
+            GpuQualityLevel: 19),
         new(
-            "Для Discord / Telegram",
-            "Для чатов",
-            "Быстрое сжатие с уменьшенным битрейтом под лимиты отправки файлов в мессенджеры.",
-            "-c:v libx264 -preset faster -crf 26 -c:a aac -b:a 96k -pix_fmt yuv420p -movflags +faststart -map 0:v:0 -map 0:a? -sn")
+            "fast",
+            "Быстрое сжатие",
+            "Быстро",
+            "Ускоренный рендеринг видео за счёт чуть большего веса файла.",
+            H264Crf: 26,
+            HevcCrf: 28,
+            Av1Crf: 32,
+            CpuPreset: "faster",
+            Av1CpuPreset: "8",
+            GpuQualityLevel: 26)
     };
 
     [ObservableProperty]
@@ -308,8 +332,8 @@ public partial class MainViewModel : ObservableObject
         _selectedExportFormat = settings.ExportFormat ?? "MP4 Видео";
         _completionAction = settings.CompletionAction ?? "Ничего не делать";
 
-        var matchingProfile = Profiles.FirstOrDefault(p => p.Name == settings.LastPresetName);
-        _selectedProfile = matchingProfile ?? Profiles[0];
+        var matchingProfile = SettingsService.ResolveProfile(settings.LastPresetName, Profiles);
+        _selectedProfile = matchingProfile;
 
         foreach (var item in AccentColors)
         {
