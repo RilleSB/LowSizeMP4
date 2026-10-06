@@ -156,4 +156,141 @@ public class FfmpegArgumentsTests
         Assert.Contains("-loop 0", args);
         Assert.DoesNotContain("-c:v", args);
     }
+
+    [Fact]
+    public void TargetSizeMode_CalculatesVideoBitrate_Correctly()
+    {
+        // 25 MB, 100 sec => (25 * 1024 * 1024 * 8 * 0.94) / 100000 = 1971 kbps total.
+        // With audio (-96k) => 1875k video bitrate, maxrate 2625k, bufsize 3750k.
+        var args = _service.BuildCompressionArguments(
+            profile: _balanceProfile,
+            isTargetSizeMode: true,
+            targetSizeMb: 25,
+            durationSeconds: 100,
+            resolution: "Оригинал",
+            fps: "Оригинал",
+            useInterpolation: false,
+            isMuteAudio: false,
+            useGpu: false,
+            gpuInfo: _cpuOnlyGpu,
+            videoCodec: "H.264 (AVC)",
+            exportFormat: "MP4 Видео");
+
+        Assert.Contains("-b:v 1875k", args);
+        Assert.Contains("-maxrate 2625k", args);
+        Assert.Contains("-bufsize 3750k", args);
+        Assert.Contains("-c:a aac -b:a 128k", args);
+    }
+
+    [Fact]
+    public void TargetSizeMode_WithMuteAudio_UsesFullBitrateAndAn()
+    {
+        // 25 MB, 100 sec with mute => 1971k video bitrate, -an flag
+        var args = _service.BuildCompressionArguments(
+            profile: _balanceProfile,
+            isTargetSizeMode: true,
+            targetSizeMb: 25,
+            durationSeconds: 100,
+            resolution: "Оригинал",
+            fps: "Оригинал",
+            useInterpolation: false,
+            isMuteAudio: true,
+            useGpu: false,
+            gpuInfo: _cpuOnlyGpu,
+            videoCodec: "H.264 (AVC)",
+            exportFormat: "MP4 Видео");
+
+        Assert.Contains("-b:v 1971k", args);
+        Assert.Contains("-an", args);
+        Assert.DoesNotContain("-c:a", args);
+    }
+
+    [Fact]
+    public void GpuEncoders_Nvenc_Qsv_Amf_ProduceCorrectFlags()
+    {
+        var nvenc = new FfmpegService.GpuEncoderInfo(true, false, false, "h264_nvenc", "hevc_nvenc", "av1_nvenc");
+        var qsv = new FfmpegService.GpuEncoderInfo(false, true, false, "h264_qsv", "hevc_qsv", "av1_qsv");
+        var amf = new FfmpegService.GpuEncoderInfo(false, false, true, "h264_amf", "hevc_amf", "av1_amf");
+
+        var nvencArgs = _service.BuildCompressionArguments(
+            profile: _balanceProfile,
+            isTargetSizeMode: false,
+            targetSizeMb: 25,
+            durationSeconds: 60,
+            resolution: "Оригинал",
+            fps: "Оригинал",
+            useInterpolation: false,
+            isMuteAudio: false,
+            useGpu: true,
+            gpuInfo: nvenc,
+            videoCodec: "H.264 (AVC)",
+            exportFormat: "MP4 Видео");
+
+        Assert.Contains("-c:v h264_nvenc", nvencArgs);
+        Assert.Contains("-rc:v vbr -cq:v 23", nvencArgs);
+
+        var qsvArgs = _service.BuildCompressionArguments(
+            profile: _balanceProfile,
+            isTargetSizeMode: false,
+            targetSizeMb: 25,
+            durationSeconds: 60,
+            resolution: "Оригинал",
+            fps: "Оригинал",
+            useInterpolation: false,
+            isMuteAudio: false,
+            useGpu: true,
+            gpuInfo: qsv,
+            videoCodec: "H.264 (AVC)",
+            exportFormat: "MP4 Видео");
+
+        Assert.Contains("-c:v h264_qsv", qsvArgs);
+        Assert.Contains("-global_quality 23", qsvArgs);
+
+        var amfArgs = _service.BuildCompressionArguments(
+            profile: _balanceProfile,
+            isTargetSizeMode: false,
+            targetSizeMb: 25,
+            durationSeconds: 60,
+            resolution: "Оригинал",
+            fps: "Оригинал",
+            useInterpolation: false,
+            isMuteAudio: false,
+            useGpu: true,
+            gpuInfo: amf,
+            videoCodec: "H.264 (AVC)",
+            exportFormat: "MP4 Видео");
+
+        Assert.Contains("-c:v h264_amf", amfArgs);
+        Assert.Contains("-rc cqp -qp_p 23", amfArgs);
+    }
+
+    [Fact]
+    public void Settings_RoundTripSerialization_And_LegacyProfileResolution()
+    {
+        var settings = new UserSettings
+        {
+            ExportFormat = "MP3 Аудио",
+            AudioBitrate = "256 kbps",
+            LastPresetName = "Максимальное сжатие",
+            VideoCodec = "AV1"
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(settings);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<UserSettings>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal("MP3 Аудио", restored.ExportFormat);
+        Assert.Equal("256 kbps", restored.AudioBitrate);
+        Assert.Equal("Максимальное сжатие", restored.LastPresetName);
+        Assert.Equal("AV1", restored.VideoCodec);
+
+        var fastProfile = new CompressionProfile("fast", "Быстро", "", "", 28, 30, 32, "fast", "7", 28);
+        var profiles = new List<CompressionProfile> { _balanceProfile, _maxCompressionProfile, _highQualityProfile, fastProfile };
+
+        Assert.Equal("max_compression", SettingsService.ResolveProfile("HEVC", profiles).Id);
+        Assert.Equal("high_quality", SettingsService.ResolveProfile("Высокое качество", profiles).Id);
+        Assert.Equal("fast", SettingsService.ResolveProfile("Discord (8 MB)", profiles).Id);
+        Assert.Equal("balance", SettingsService.ResolveProfile("balance", profiles).Id);
+        Assert.Equal("balance", SettingsService.ResolveProfile(null, profiles).Id);
+    }
 }
